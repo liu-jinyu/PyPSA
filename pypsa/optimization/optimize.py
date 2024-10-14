@@ -16,7 +16,7 @@ import pandas as pd
 from linopy import Model, merge
 from linopy.solvers import available_solvers
 
-from pypsa.descriptors import additional_linkports, get_committable_i, nominal_attrs
+from pypsa.descriptors import additional_linkports, get_committable_i, get_bid_status_i, nominal_attrs
 from pypsa.descriptors import get_switchable_as_dense as get_as_dense
 from pypsa.optimization.abstract import (
     optimize_and_run_non_linear_powerflow,
@@ -41,6 +41,7 @@ from pypsa.optimization.constraints import (
     define_ramp_limit_constraints,
     define_storage_unit_constraints,
     define_store_constraints,
+    define_bid_constraints,
 )
 from pypsa.optimization.global_constraints import (
     define_growth_limit,
@@ -57,6 +58,7 @@ from pypsa.optimization.variables import (
     define_nominal_variables,
     define_operational_variables,
     define_shut_down_variables,
+    define_bid_curve_variables,
     define_spillage_variables,
     define_start_up_variables,
     define_status_variables,
@@ -148,6 +150,19 @@ def define_objective(n: Network, sns: pd.Index) -> None:
             operation = m[f"{c}-{attr}"].sel({"snapshot": sns, c: cost.columns})
             objective.append((operation * operation * cost).sum())
             is_quadratic = True
+    
+    # bid curve calculated cost
+    c = "Generator"
+    attr = "bid_p"
+    bid_i = get_bid_status_i(n, c)
+    for i in range(10):
+        bid_price = get_as_dense(n, c, f"bid_p{i}", sns, bid_i)
+        if bid_price.isnull().values.any():
+            raise ValueError(
+                f"Costs for bid curve {i} in component {c} are not defined."
+            )
+        operation = m[f"{c}-{attr}"].sel({"snapshot": sns, c: bid_price.columns, "p_index":i})
+        objective.append((operation * bid_price).sum())
 
     # stand-by cost
     comps = {"Generator", "Link"}
@@ -260,6 +275,7 @@ def create_model(
         define_start_up_variables(n, sns, c)
         define_shut_down_variables(n, sns, c)
 
+    define_bid_curve_variables(n, sns)
     define_spillage_variables(n, sns)
     define_operational_variables(n, sns, "Store", "p")
 
@@ -283,6 +299,8 @@ def create_model(
         define_operational_constraints_for_committables(n, sns, c)
         define_ramp_limit_constraints(n, sns, c, attr)
         define_fixed_operation_constraints(n, sns, c, attr)
+
+    define_bid_constraints(n, sns)
 
     meshed_buses = get_strongly_meshed_buses(n)
     weakly_meshed_buses = n.buses.index.difference(meshed_buses)

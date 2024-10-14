@@ -6,6 +6,7 @@ Define optimisation variables from PyPSA networks with Linopy.
 from __future__ import annotations
 
 import logging
+import pandas as pd
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
@@ -38,6 +39,37 @@ def define_operational_variables(n: Network, sns: Sequence, c: str, attr: str) -
     coords = [sns, n.static(c).index.rename(c)]
     n.model.add_variables(coords=coords, name=f"{c}-{attr}", mask=active)
 
+def define_bid_curve_variables(n: Network, sns: Sequence) -> None:
+    """
+    Initializes variables for power dispatch for a given component and a given
+    attribute.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+    c : str
+        name of the network component
+    attr : str
+        name of the attribute, e.g. 'p'
+    """
+
+    c = "Generator"
+    if n.static(c).empty:
+        return
+    
+    bid_i = n.get_bid_status_i(c)
+    if bid_i.empty:
+        return
+
+    assert (get_as_dense(n, c, "marginal_cost", sns)[bid_i]==0).all().all(),\
+        "Not all bidders assigned zero marginal cost"
+    assert (get_as_dense(n, c, "marginal_cost_quadratic", sns)[bid_i]==0).all().all(),\
+        "Not all bidders assigned zero marginal cost quadratic"
+    
+    active = get_activity_mask(n, c, sns)
+    p_index =pd.RangeIndex(10,name="p_index")
+    coords = [sns,bid_i.rename(c),p_index]
+    n.model.add_variables(coords=coords, name=f"{c}-bid_p", mask=active)
 
 def define_status_variables(n: Network, sns: Sequence, c: str) -> None:
     com_i = n.get_committable_i(c)
