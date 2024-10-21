@@ -16,7 +16,7 @@ import pandas as pd
 from linopy import Model, merge
 from linopy.solvers import available_solvers
 
-from pypsa.descriptors import additional_linkports, get_committable_i, get_bid_status_i, nominal_attrs
+from pypsa.descriptors import additional_linkports, get_committable_i, nominal_attrs
 from pypsa.descriptors import get_switchable_as_dense as get_as_dense
 from pypsa.optimization.abstract import (
     optimize_and_run_non_linear_powerflow,
@@ -127,8 +127,9 @@ def define_objective(n: Network, sns: pd.Index) -> None:
     # marginal costs, marginal storage cost, and spill cost
     for cost_type in ["marginal_cost", "marginal_cost_storage", "spill_cost"]:
         for c, attr in lookup.query(cost_type).index:
+            use_cost = n.get_non_bid_generators(c)
             cost = (
-                get_as_dense(n, c, cost_type, sns)
+                get_as_dense(n, c, cost_type, sns, use_cost)
                 .loc[:, lambda ds: (ds != 0).any()]
                 .mul(weighting, axis=0)
             )
@@ -140,8 +141,9 @@ def define_objective(n: Network, sns: pd.Index) -> None:
     # marginal cost quadratic
     for c, attr in lookup.query("marginal_cost").index:
         if "marginal_cost_quadratic" in n.static(c):
+            use_cost = n.get_non_bid_generators(c)
             cost = (
-                get_as_dense(n, c, "marginal_cost_quadratic", sns)
+                get_as_dense(n, c, "marginal_cost_quadratic", sns, use_cost)
                 .loc[:, lambda ds: (ds != 0).any()]
                 .mul(weighting, axis=0)
             )
@@ -153,15 +155,15 @@ def define_objective(n: Network, sns: pd.Index) -> None:
     
     # bid curve calculated cost
     c = "Generator"
-    attr = "bid_p"
-    bid_i = get_bid_status_i(n, c)
+    attr = "p_bid"
+    use_bid = n.get_bid_generators(c)
     for i in range(10):
-        bid_price = get_as_dense(n, c, f"bid_p{i}", sns, bid_i)
+        bid_price = get_as_dense(n, c, f"bid_price{i}", sns, use_bid)
         if bid_price.isnull().values.any():
             raise ValueError(
                 f"Costs for bid curve {i} in component {c} are not defined."
             )
-        operation = m[f"{c}-{attr}"].sel({"snapshot": sns, c: bid_price.columns, "p_index":i})
+        operation = m[f"{c}-{attr}"].sel({"snapshot": sns, c: bid_price.columns, "bid_segment":i})
         objective.append((operation * bid_price).sum())
 
     # stand-by cost

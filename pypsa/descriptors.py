@@ -266,18 +266,29 @@ def get_committable_i(n: Network, c: str) -> pd.Index:
         idx = n.static(c)[lambda ds: ds["committable"]].index
     return idx.rename(f"{c}-com")
 
-def get_bid_status_i(n: Network, c: str) -> pd.Index:
+def get_bid_generators(n: Network, c: str) -> pd.Index:
     """
     Getter function.
 
-    Get the index of bid status elements of a given component.
+    Get the index of generators that use bid curves.
     """
-    if "bid_curve" not in n.static(c):
+    if "use_bid_curve" not in n.static(c):
         idx = pd.Index([])
     else:
-        idx = n.static(c)[lambda ds: ds["bid_curve"]].index
+        idx = n.static(c)[lambda ds: ds["use_bid_curve"]].index
     return idx.rename(f"{c}-bid")
 
+def get_non_bid_generators(n: Network, c: str) -> pd.Index:
+    """
+    Getter function.
+
+    Get the index of generators that use cost functions.
+    """
+    if "use_bid_curve" not in n.static(c):
+        idx = pd.Index([])
+    else:
+        idx = n.static(c)[lambda ds: ~ds["use_bid_curve"]].index
+    return idx.rename(f"{c}-cost")
 
 def get_active_assets(
     n: Network | SubNetwork,

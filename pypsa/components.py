@@ -47,7 +47,8 @@ from pypsa.definitions.structures import Dict
 from pypsa.descriptors import (
     get_active_assets,
     get_committable_i,
-    get_bid_status_i,
+    get_bid_generators,
+    get_non_bid_generators,
     get_extendable_i,
     get_non_extendable_i,
     get_switchable_as_dense,
@@ -253,7 +254,8 @@ class Network:
 
     # from pypsa.descriptors
     get_committable_i = get_committable_i
-    get_bid_status_i = get_bid_status_i
+    get_bid_generators = get_bid_generators
+    get_non_bid_generators = get_non_bid_generators
     get_extendable_i = get_extendable_i
     get_switchable_as_dense = get_switchable_as_dense
     get_non_extendable_i = get_non_extendable_i
