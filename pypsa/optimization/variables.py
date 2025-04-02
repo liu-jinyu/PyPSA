@@ -54,13 +54,29 @@ def define_bid_curve_variables(n: Network, sns: Sequence) -> None:
     """
 
     c = "Generator"
-    use_bid = n.get_bid_generators(c)
-    if n.static(c).empty or use_bid.empty:
+    bid_i = n.get_bid_generators(c)
+    if bid_i.empty:
         return
-    
-    active = get_activity_mask(n, c, sns)    
     bid_segment = pd.RangeIndex(10,name="bid_segment")
-    coords = [sns,use_bid.rename(c),bid_segment]
+    coords = (sns,bid_i,bid_segment)
+
+    # bid_masks = [] # Add 10 bid masks
+    # import xarray as xr
+    # for i in range(10):
+    #     bm = get_as_dense(n, c, f"bid_power{i}", sns, bid_i)
+    #     bid_masks.append(xr.DataArray(bm,coords=coords[:2]))
+    # active = xr.concat(bid_masks,bid_segment)
+
+    from linopy.common import as_dataarray
+
+    bid_masks = []
+    import numpy as np
+    for i in range(10):
+        bm = get_as_dense(n, c, f"bid_power{i}", sns, bid_i)
+        bid_masks.append(bm.values)
+    active = np.stack(bid_masks,axis=2)
+    active = as_dataarray(active,coords=coords)
+    
     n.model.add_variables(coords=coords, name=f"{c}-p_bid", mask=active)
 
 def define_status_variables(n: Network, sns: Sequence, c: str) -> None:

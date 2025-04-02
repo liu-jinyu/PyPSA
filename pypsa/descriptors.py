@@ -276,7 +276,7 @@ def get_bid_generators(n: Network, c: str) -> pd.Index:
         idx = pd.Index([])
     else:
         idx = n.static(c)[lambda ds: ds["use_bid_curve"]].index
-    return idx.rename(f"{c}-bid")
+    return idx.rename(f"{c}")
 
 def get_non_bid_generators(n: Network, c: str) -> pd.Index:
     """

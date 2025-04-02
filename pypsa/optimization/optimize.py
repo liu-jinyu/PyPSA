@@ -157,14 +157,15 @@ def define_objective(n: Network, sns: pd.Index) -> None:
     c = "Generator"
     attr = "p_bid"
     use_bid = n.get_bid_generators(c)
-    for i in range(10):
-        bid_price = get_as_dense(n, c, f"bid_price{i}", sns, use_bid)
-        if bid_price.isnull().values.any():
-            raise ValueError(
-                f"Costs for bid curve {i} in component {c} are not defined."
-            )
-        operation = m[f"{c}-{attr}"].sel({"snapshot": sns, c: bid_price.columns, "bid_segment":i})
-        objective.append((operation * bid_price).sum())
+    if not use_bid.empty:
+        for i in range(10):
+            bid_price = get_as_dense(n, c, f"bid_price{i}", sns, use_bid)
+            if bid_price.isnull().values.any():
+                raise ValueError(
+                    f"Costs for bid curve {i} in component {c} are not defined."
+                )
+            operation = m[f"{c}-{attr}"].sel({"snapshot": sns, c: use_bid, "bid_segment":i})
+            objective.append((operation * bid_price).sum())
 
     # stand-by cost
     comps = {"Generator", "Link"}

@@ -347,13 +347,13 @@ def define_nominal_constraints_for_extendables(n: Network, c: str, attr: str) ->
 def define_bid_constraints(n: Network, sns: pd.Index)->None:
     c = "Generator"
     attr = "p_bid"
-    use_bid = n.get_bid_generators(c)
-    if use_bid.empty:
+    bid_i = n.get_bid_generators(c)
+    if bid_i.empty:
         return
     
     for i in range(10):
-        bid_quantity = get_as_dense(n, c, f"bid_power{i}", sns)
-        power_segment = n.model[f"{c}-{attr}"].sel({"snapshot": sns, c: bid_quantity.columns, "bid_segment":i})
+        bid_quantity = get_as_dense(n, c, f"bid_power{i}", sns, bid_i)
+        power_segment = n.model[f"{c}-{attr}"].sel({"snapshot": sns, "Generator": bid_i, "bid_segment":i})
         n.model.add_constraints(
             power_segment, ">=", 0, name=f"{c}-{attr}-lower{i}"
         )
@@ -361,9 +361,11 @@ def define_bid_constraints(n: Network, sns: pd.Index)->None:
             power_segment, "<=", bid_quantity, name=f"{c}-{attr}-upper{i}"
         )
     
+    # add constraints for sum of bid quantities with masks( because generator-p is not masked)
     sum_power_segment = n.model[f"{c}-{attr}"].sum("bid_segment")
+    active = get_activity_mask(n, c, sns, bid_i)
     n.model.add_constraints(
-        sum_power_segment, "=", n.model[f"{c}-p"], name=f"{c}-{attr}-sum"
+        sum_power_segment, "=", n.model[f"{c}-p"].sel({"snapshot": sns, "Generator": bid_i}), name=f"{c}-{attr}-sum", mask = active
     )
 
 def define_ramp_limit_constraints(n: Network, sns: pd.Index, c: str, attr: str) -> None:
